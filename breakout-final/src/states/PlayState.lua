@@ -110,10 +110,13 @@ function PlayState:update(dt)
                     end
                 end
 
-                -- if we have enough points, recover a point of health
+                -- if we have enough points, recover a point of health and increase size
                 if self.score > self.recoverPoints then
                     -- can't go above 3 health
                     self.health = math.min(3, self.health + 1)
+
+                    self.paddle.size = math.min(4, self.paddle.size + 1)
+                    self.paddle.width = 32 * self.paddle.size
 
                     -- multiply recover points by 2
                     self.recoverPoints = math.min(100000, self.recoverPoints * 2)
@@ -211,6 +214,9 @@ function PlayState:update(dt)
                         highScores = self.highScores
                     })
                 else
+                    self.paddle.size = math.max(1, self.paddle.size - 1)
+                    self.paddle.width = 32 * self.paddle.size
+                    
                     gStateMachine:change('serve', {
                         paddle = self.paddle,
                         bricks = self.bricks,

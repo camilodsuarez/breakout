@@ -30,7 +30,7 @@ function PlayState:enter(params)
     table.insert(self.balls, params.ball)
     self.level = params.level
 
-    self.recoverPoints = 5000
+    self.recoverPoints = params.recoverPoints or 5000
 
     -- give ball random starting velocity
     self.balls[1].dx = math.random(-200, 200)
@@ -193,6 +193,7 @@ function PlayState:update(dt)
         -- but if there's still at least one ball, the player doesn't loose a life
         if ball.y >= VIRTUAL_HEIGHT then
             ball.remove = true
+            gSounds['hurt']:play()
         end
     end
 

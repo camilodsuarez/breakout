@@ -47,6 +47,9 @@ function LevelMaker.createMap(level)
     -- highest color of the highest tier, no higher than 5
     local highestColor = math.min(5, level % 5 + 3)
 
+    -- whether to add a locked brick in this level
+    local addLockedBrick = math.random(1, 2) == 1 and true or false
+
     -- lay out bricks such that they touch each other and fill the space
     for y = 1, numRows do
         -- whether we want to enable skipping for this row
@@ -118,6 +121,14 @@ function LevelMaker.createMap(level)
             ::continue::
         end
     end 
+
+    -- choose a random brick to lock if necessary
+    if #bricks ~= 0 and addLockedBrick then
+        local k = math.random(#bricks)
+        bricks[k].isLocked = true
+        bricks[k].tier = 0
+        bricks[k].color = 6
+    end
 
     -- in the event we didn't generate any bricks, try again
     if #bricks == 0 then

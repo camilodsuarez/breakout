@@ -38,6 +38,12 @@ function PlayState:enter(params)
 
     self.powerupSpawned = false -- true if a powerup has spawned
     self.brickHits = 0 -- number of times the ball has hit a brick
+
+    if PlayState:getLockedBrick(self.bricks) then
+        self.lockedBrick = self.bricks[PlayState:getLockedBrick(self.bricks)]
+    end
+    self.keyGrabbed = false
+    self.keyTimer = 0
 end
 
 function PlayState:update(dt)
@@ -54,7 +60,6 @@ function PlayState:update(dt)
         return
     end
 
-    -- update positions based on velocity
     self.paddle:update(dt)
 
     for k, ball in pairs(self.balls) do
@@ -65,6 +70,15 @@ function PlayState:update(dt)
         self.powerup:update(dt)
     end
 
+    if self.key then
+        self.key:update(dt)
+    end
+
+    if self.lockedBrick then -- the timer isn't used if there is no locked brick
+        self.keyTimer = self.keyTimer + dt
+    end
+
+    -- check if any ball hits the paddle
     for k, ball in pairs(self.balls) do
         if ball:collides(self.paddle) then
             -- raise ball above paddle in case it goes below it, then reverse dy
@@ -95,49 +109,51 @@ function PlayState:update(dt)
             -- only check collision if we're in play
             if brick.inPlay and ball:collides(brick) then
 
-                -- add to score
-                self.score = self.score + (brick.tier * 200 + brick.color * 25)
+                if not brick.isLocked then
+                    -- add to score
+                    self.score = self.score + (brick.tier * 200 + brick.color * 25)
 
-                -- trigger the brick's hit function, which removes it from play
-                brick:hit()
+                    -- trigger the brick's hit function, which removes it from play
+                    brick:hit()
 
-                -- a powerup appears after 10 hits (only once)
-                if not self.powerupSpawned then
-                    self.brickHits = self.brickHits + 1
-                    if self.brickHits >= 10 then
-                        self.powerupSpawned = true
-                        self.powerup = Powerup(brick.x + brick.width / 2 - 8, brick.y + brick.height, 1)
+                    -- a powerup appears after 10 hits (only once)
+                    if not self.powerupSpawned then
+                        self.brickHits = self.brickHits + 1
+                        if self.brickHits >= 10 then
+                            self.powerupSpawned = true
+                            self.powerup = Powerup(brick.x + brick.width / 2 - 8, brick.y + brick.height, 1)
+                        end
                     end
-                end
 
-                -- if we have enough points, recover a point of health and increase size
-                if self.score > self.recoverPoints then
-                    -- can't go above 3 health
-                    self.health = math.min(3, self.health + 1)
+                    -- if we have enough points, recover a point of health and increase size
+                    if self.score > self.recoverPoints then
+                        -- can't go above 3 health
+                        self.health = math.min(3, self.health + 1)
 
-                    self.paddle.size = math.min(4, self.paddle.size + 1)
-                    self.paddle.width = 32 * self.paddle.size
+                        self.paddle.size = math.min(4, self.paddle.size + 1)
+                        self.paddle.width = 32 * self.paddle.size
 
-                    -- multiply recover points by 2
-                    self.recoverPoints = math.min(100000, self.recoverPoints * 2)
+                        -- multiply recover points by 2
+                        self.recoverPoints = math.min(100000, self.recoverPoints * 2)
 
-                    -- play recover sound effect
-                    gSounds['recover']:play()
-                end
+                        -- play recover sound effect
+                        gSounds['recover']:play()
+                    end
 
-                -- go to our victory screen if there are no more bricks left
-                if self:checkVictory() then
-                    gSounds['victory']:play()
+                    -- go to our victory screen if there are no more bricks left
+                    if self:checkVictory() then
+                        gSounds['victory']:play()
 
-                    gStateMachine:change('victory', {
-                        level = self.level,
-                        paddle = self.paddle,
-                        health = self.health,
-                        score = self.score,
-                        highScores = self.highScores,
-                        ball = self.balls[1],
-                        recoverPoints = self.recoverPoints
-                    })
+                        gStateMachine:change('victory', {
+                            level = self.level,
+                            paddle = self.paddle,
+                            health = self.health,
+                            score = self.score,
+                            highScores = self.highScores,
+                            ball = self.balls[1],
+                            recoverPoints = self.recoverPoints
+                        })
+                    end
                 end
 
                 --
@@ -191,20 +207,21 @@ function PlayState:update(dt)
         end
     end
 
+    -- if a ball goes below bounds, it has to be removed
+    -- but if there's still at least one ball, the player doesn't loose a life
     for k, ball in pairs(self.balls) do
-        -- if a ball goes below bounds, it has to be removed
-        -- but if there's still at least one ball, the player doesn't loose a life
         if ball.y >= VIRTUAL_HEIGHT then
             ball.remove = true
             gSounds['hurt']:play()
         end
     end
 
+    -- remove a ball if necessary and check if it's game over
     for k, ball in pairs(self.balls) do
         if ball.remove then
             table.remove(self.balls, k)
 
-            if #self.balls == 0 then
+            if #self.balls == 0 then -- there's no balls left
                 self.health = self.health - 1
                 gSounds['hurt']:play()
 
@@ -252,6 +269,27 @@ function PlayState:update(dt)
         self.powerup = nil
     end
 
+    -- spawn a key every 20 seconds
+    if not self.key and not self.keyGrabbed and self.keyTimer >= 20 then
+        self.key = Powerup(self.lockedBrick.x + self.lockedBrick.width / 2 - 8, 
+        self.lockedBrick.y + self.lockedBrick.height, 4)
+    end
+
+    -- check if player grabs the key 
+    if self.key and self.key:collides(self.paddle) then
+        -- change the status of the locked brick
+        self.lockedBrick.isLocked = false
+
+        self.keyGrabbed = true
+        self.key = nil
+    end
+
+    -- check if key goes below bounds; the key should reappear
+    if self.key and self.key.y >= VIRTUAL_HEIGHT then
+        self.keyTimer = 0
+        self.key = nil
+    end
+
     -- for rendering particle systems
     for k, brick in pairs(self.bricks) do
         brick:update(dt)
@@ -283,6 +321,10 @@ function PlayState:render()
         self.powerup:render()
     end
 
+    if self.key then
+        self.key:render()
+    end
+
     renderScore(self.score)
     renderHealth(self.health)
 
@@ -301,4 +343,15 @@ function PlayState:checkVictory()
     end
 
     return true
+end
+
+-- used to get the locked brick if there is one
+function PlayState:getLockedBrick(bricks)
+    for k, brick in pairs(bricks) do
+        if brick.isLocked then
+            return k
+        end
+    end
+
+    return nil
 end

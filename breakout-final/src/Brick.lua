@@ -47,6 +47,12 @@ paletteColors = {
         ['r'] = 251,
         ['g'] = 242,
         ['b'] = 54
+    },
+    -- grey
+    [6] = {
+        ['r'] = 137,
+        ['g'] = 131,
+        ['b'] = 142
     }
 }
 
@@ -59,6 +65,9 @@ function Brick:init(x, y)
     self.y = y
     self.width = 32
     self.height = 16
+
+    -- used to check if it's a locked brick that can only be broken with a key
+    self.isLocked = false
     
     -- used to determine whether this brick should be rendered
     self.inPlay = true
@@ -135,11 +144,15 @@ end
 
 function Brick:render()
     if self.inPlay then
-        love.graphics.draw(gTextures['main'], 
-            -- multiply color by 4 (-1) to get our color offset, then add tier to that
-            -- to draw the correct tier and color brick onto the screen
-            gFrames['bricks'][1 + ((self.color - 1) * 4) + self.tier],
-            self.x, self.y)
+        if not self.isLocked then
+            love.graphics.draw(gTextures['main'], 
+                -- multiply color by 4 (-1) to get our color offset, then add tier to that
+                -- to draw the correct tier and color brick onto the screen
+                gFrames['bricks'][1 + ((self.color - 1) * 4) + self.tier],
+                self.x, self.y)
+        else
+            love.graphics.draw(gTextures['main'], gFrames['bricks'][22], self.x, self.y)
+        end
     end
 end
 
